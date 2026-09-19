@@ -1,0 +1,17 @@
+// KQL Detection Rules for Active Directory Attacks
+// Target Log: Security (EventID 4769: A Kerberos service ticket was requested)
+
+// 1. Kerberoasting Detection: High volume of RC4 encrypted TGS requests (Encryption Type 0x17)
+SecurityEvent
+| where EventID == 4769
+| where TicketEncryptionType == "0x17"
+| summarize RequestCount = count() by TargetUserName, IpAddress, bin(TimeGenerated, 5m)
+| where RequestCount > 5
+| sort by RequestCount desc
+| render timechart
+
+// 2. AS-REP Roasting Detection: Accounts with DoNotRequirePreAuth requested without pre-authentication
+SecurityEvent
+| where EventID == 4768
+| where PreAuthType == "0"
+| project TimeGenerated, TargetUserName, IpAddress, ResultCode
