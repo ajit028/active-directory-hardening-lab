@@ -1,0 +1,91 @@
+// ============================================================================
+// MICROSOFT SENTINEL KQL DETECTION RULES
+// Active Directory Security Auditing & Hardening Lab
+// Author: Ajit Nayak (https://ajit028.github.io)
+// ============================================================================
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rule 1: Kerberoasting Detection (RC4 TGS Requests - Event ID 4769)
+// MITRE ATT&CK: T1558.003
+// ────────────────────────────────────────────────────────────────────────────
+SecurityEvent
+| where EventID == 4769
+| where TicketEncryptionType == "0x17" // RC4-HMAC encryption (insecure)
+| where ServiceName !endswith "$"      // Exclude machine account service tickets
+| where ServiceName !in ("krbtgt", "kadmin/changepw")
+| summarize 
+    RequestCount = count(), 
+    TargetServices = make_set(ServiceName, 10),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated)
+    by IpAddress, Account, bin(TimeGenerated, 10m)
+| where RequestCount >= 3              // Threshold: 3+ RC4 requests in 10 minutes
+| extend 
+    AssignedMitreTechnique = "T1558.003",
+    Severity = "High",
+    Description = strcat("Potential Kerberoasting attack detected from IP ", IpAddress, " by account ", Account)
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rule 2: AS-REP Roasting Detection (Event ID 4768 with PreAuth Type 0)
+// MITRE ATT&CK: T1558.004
+// ────────────────────────────────────────────────────────────────────────────
+SecurityEvent
+| where EventID == 4768
+| where PreAuthType == "0x0"          // Pre-authentication not required / type 0
+| where ResultCode == "0x0"           // Successful AS-REQ issuance (hash acquired)
+| project TimeGenerated, Computer, Account, IpAddress, PreAuthType, ResultCode
+| extend 
+    AssignedMitreTechnique = "T1558.004",
+    Severity = "High",
+    Description = strcat("AS-REP Roasting attempt: Account ", Account, " requested ticket without pre-authentication from IP ", IpAddress)
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rule 3: Abnormal TGS Request Volume (Potential Automated Scraping)
+// MITRE ATT&CK: T1558.003 / T1087.002
+// ────────────────────────────────────────────────────────────────────────────
+SecurityEvent
+| where EventID == 4769
+| where ServiceName !endswith "$"
+| summarize 
+    TotalTickets = count(),
+    UniqueServices = dcount(ServiceName)
+    by Account, IpAddress, bin(TimeGenerated, 5m)
+| where TotalTickets > 20 or UniqueServices > 10
+| extend 
+    AssignedMitreTechnique = "T1558.003",
+    Severity = "Medium",
+    Description = strcat("High volume TGS ticket requests (", TotalTickets, " requests for ", UniqueServices, " unique services) by ", Account)
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rule 4: Golden Ticket Detection (Abnormal Lifetime / Invalid KRBTGT Request)
+// MITRE ATT&CK: T1558.001
+// ────────────────────────────────────────────────────────────────────────────
+SecurityEvent
+| where EventID == 4769
+| where ServiceName == "krbtgt"
+| where TicketOptions has "0x40810000" or TicketLifetime > 10 // Abnormal TGT lifetime or options
+| project TimeGenerated, Account, IpAddress, ServiceName, TicketOptions, TicketEncryptionType
+| extend 
+    AssignedMitreTechnique = "T1558.001",
+    Severity = "Critical",
+    Description = strcat("Potential Golden Ticket / Forged TGT request for krbtgt service by ", Account)
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rule 5: DCSync Detection (Directory Service Replication - Event ID 4662)
+// MITRE ATT&CK: T1003.006
+// ────────────────────────────────────────────────────────────────────────────
+let DCSyncGUID = "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2"; // DS-Replication-Get-Changes-All
+SecurityEvent
+| where EventID == 4662
+| where Properties has DCSyncGUID
+| where Account !endswith "$"          // Exclude domain controllers / computer accounts
+| where AccountName != "SYSTEM"
+| summarize EventCount = count(), FirstSeen = min(TimeGenerated) by Account, IpAddress, Computer, bin(TimeGenerated, 1h)
+| extend 
+    AssignedMitreTechnique = "T1003.006",
+    Severity = "Critical",
+    Description = strcat("Potential DCSync attack: Account ", Account, " requested replication rights for DS-Replication-Get-Changes-All")

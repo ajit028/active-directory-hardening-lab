@@ -1,0 +1,34 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project-specific ignores
+*.zip
+*.log
+*.pcap
+*.csv
+*asrep_hashes.txt*
+*kerb_hashes.txt*
+*.kerberos/
+
+# BloodHound data
+*BloodHound.zip
+*.json
+
+# Visual Studio Code / Editor Settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# PowerShell
+*.ps1xml
+*.clixml

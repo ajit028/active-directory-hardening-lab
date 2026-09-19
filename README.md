@@ -1,24 +1,265 @@
-# Active Directory Security Auditing & Hardening Lab
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Active%20Directory-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Active Directory"/>
+  <img src="https://img.shields.io/badge/Language-PowerShell-5391FE?style=for-the-badge&logo=powershell&logoColor=white" alt="PowerShell"/>
+  <img src="https://img.shields.io/badge/Detection-KQL%20%7C%20SPL-00A4EF?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="KQL | SPL"/>
+  <img src="https://img.shields.io/badge/Framework-MITRE%20ATT%26CK-E34F26?style=for-the-badge&logo=shield&logoColor=white" alt="MITRE ATT&CK"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
+</p>
 
-Simulated adversary techniques including Kerberoasting, AS-REP roasting, and BloodHound attack path analysis within a multi-forest AD environment. Hardened domain policies against ticket extraction and eliminated legacy weak ciphers.
+<h1 align="center">🛡️ Active Directory Security Auditing & Hardening Lab</h1>
 
-## Overview
+<p align="center">
+  <strong>A hands-on offensive + defensive lab environment for simulating real-world Active Directory attacks, building production-grade detection rules, and implementing enterprise hardening controls — mapped to MITRE ATT&CK.</strong>
+</p>
 
-This repository documents hands-on Active Directory (AD) security hardening, attack simulation, and telemetry detection engineering. It demonstrates how enterprise environments are compromised via identity vectors and how SOC analysts detect and mitigate these paths.
+<p align="center">
+  <a href="#architecture">Architecture</a> •
+  <a href="#attack-simulations">Attack Simulations</a> •
+  <a href="#detection-engineering">Detection Engineering</a> •
+  <a href="#hardening">Hardening</a> •
+  <a href="#mitre-attck-mapping">MITRE ATT&CK</a> •
+  <a href="#lab-setup">Lab Setup</a>
+</p>
 
-## Key Components
+---
 
-- **Attack Path Analysis (`BloodHound`)**: Mapped Domain Controller attack paths, identifying high-value targets, unconstrained delegation, and Kerberoastable service accounts.
-- **Credential Harvesting Simulation**: Executed Kerberoasting (`EventID 4769`) and AS-REP roasting to extract service ticket hashes.
-- **Hardening & Remediation**: Implemented AES encryption enforcement (disabling RC4), fine-grained password policies (FGPP), and GPO hardening against ticket extraction (LSASS protection).
-- **SIEM Detection Engineering**: Authored KQL queries to detect anomalous TGS request volumes and suspicious RC4 ticket requests.
+## 📋 Overview
 
-## Directory Structure
+This project provides a **complete, reproducible Active Directory security lab** designed for security professionals and aspiring SOC analysts. It covers the full attack lifecycle — from initial reconnaissance through credential theft to detection and response — with production-quality artifacts at every stage.
 
-- `audit-checklist.md` – Enterprise AD hardening checklist.
-- `detection-rules.kql` – KQL detection rules for Kerberoasting and AS-REP roasting.
-- `simulate-kerberoasting.ps1` – PowerShell script for simulated Kerberoasting discovery and telemetry testing.
+**What makes this different:**
+- Real PowerShell attack simulations that generate authentic Windows Event Log telemetry
+- Detection rules written in both **KQL** (Microsoft Sentinel) and **SPL** (Splunk) — ready to deploy
+- Hardening scripts that implement CIS Benchmark and Microsoft security baselines
+- Full MITRE ATT&CK mapping with technique IDs and detection coverage matrix
 
-## License
+---
 
-MIT
+## 🏗️ Architecture {#architecture}
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        LAB NETWORK — 10.0.0.0/24                          │
+│                                                                           │
+│  ┌─────────────────────┐    ┌─────────────────────┐                       │
+│  │   DOMAIN CONTROLLER │    │   WINDOWS 10 CLIENT │                       │
+│  │   DC01 (10.0.0.10)  │    │   WS01 (10.0.0.20)  │                       │
+│  │                     │    │                     │                       │
+│  │  • Windows Server   │◄──►│  • Domain-joined    │                       │
+│  │    2019             │    │  • Sysmon installed  │                       │
+│  │  • AD DS, DNS, DHCP │    │  • Standard user +   │                       │
+│  │  • Advanced Audit   │    │    local admin       │                       │
+│  │    Policies enabled │    │  • WinRM enabled     │                       │
+│  │  • Sysmon + WEF     │    │                     │                       │
+│  └────────┬────────────┘    └──────────┬──────────┘                       │
+│           │                            │                                  │
+│           │     ┌──────────────────┐   │                                  │
+│           │     │  SIEM / SENTINEL │   │                                  │
+│           ├────►│  (10.0.0.50)     │◄──┘                                  │
+│           │     │                  │                                      │
+│           │     │  • Log Analytics │          ┌─────────────────────┐     │
+│           │     │    Workspace     │          │   ATTACKER MACHINE  │     │
+│           │     │  • KQL Rules     │          │   KALI (10.0.0.99) │     │
+│           │     │  • Sentinel      │          │                     │     │
+│           │     │    Workbooks     │          │  • Impacket         │     │
+│           │     └──────────────────┘          │  • Rubeus           │     │
+│           │                                   │  • BloodHound       │     │
+│           │                                   │  • CrackMapExec     │     │
+│           └───────────────────────────────────┤  • Mimikatz         │     │
+│                                               └─────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  LOG FLOW:  DC01/WS01 → Windows Event Forwarding → SIEM (Sentinel)     │
+  │  TELEMETRY: Sysmon (Process, Network, Registry) + Security Event Log   │
+  │  DETECTION: KQL analytics rules + Splunk correlation searches          │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ⚔️ Attack Simulations {#attack-simulations}
+
+### 1. Kerberoasting (`attacks/kerberoasting-sim.ps1`)
+
+Simulates a **Kerberoasting** attack by enumerating Service Principal Name (SPN) accounts and requesting Kerberos TGS tickets using RC4 encryption — the tickets can then be cracked offline. This script generates **Event ID 4769** telemetry that feeds directly into the detection rules.
+
+```powershell
+# Enumerate SPN accounts → Request TGS tickets → Generate 4769 events
+.\attacks\kerberoasting-sim.ps1 -Verbose
+```
+
+**What the attacker gains:** Offline-crackable service account password hashes  
+**Detection signal:** Spike in 4769 events with RC4 (0x17) encryption type from a single source
+
+### 2. AS-REP Roasting (`attacks/asrep-roasting-sim.ps1`)
+
+Targets accounts with **Kerberos Pre-Authentication disabled** (`DONT_REQ_PREAUTH`). The script requests AS-REP responses containing the user's encrypted timestamp — crackable offline without any authentication.
+
+```powershell
+# Find vulnerable accounts → Extract AS-REP hashes → Generate 4768 events
+.\attacks\asrep-roasting-sim.ps1 -Verbose
+```
+
+**What the attacker gains:** Password hashes for accounts with weak Kerberos config  
+**Detection signal:** Event 4768 with PreAuth Type 0 (no pre-authentication)
+
+### 3. BloodHound Attack Path Analysis (`attacks/bloodhound-guide.md`)
+
+Step-by-step guide for running **SharpHound** collection, ingesting data into **BloodHound**, and identifying critical attack paths:
+- Shortest path to Domain Admin
+- Kerberoastable user paths
+- Unconstrained delegation abuse
+- ACL-based privilege escalation chains
+
+---
+
+## 🔍 Detection Engineering {#detection-engineering}
+
+Production-ready detection rules in two SIEM platforms:
+
+| Detection Rule | KQL (Sentinel) | SPL (Splunk) | Event ID | MITRE Technique |
+|---|---|---|---|---|
+| Kerberoasting (RC4 TGS) | ✅ | ✅ | 4769 | T1558.003 |
+| AS-REP Roasting | ✅ | ✅ | 4768 | T1558.004 |
+| Abnormal TGS Volume | ✅ | ✅ | 4769 | T1558.003 |
+| Golden Ticket | ✅ | ✅ | 4769 | T1558.001 |
+| DCSync | ✅ | ✅ | 4662 | T1003.006 |
+
+### Sample KQL — Kerberoasting Detection
+
+```kql
+SecurityEvent
+| where EventID == 4769
+| where TicketEncryptionType == "0x17"   // RC4
+| where ServiceName !endswith "$"        // Exclude machine accounts
+| summarize RequestCount = count(), TargetServices = make_set(ServiceName)
+    by IpAddress, Account, bin(TimeGenerated, 5m)
+| where RequestCount > 3
+```
+
+---
+
+## 🔒 Hardening Controls {#hardening}
+
+### GPO Hardening Script (`hardening/gpo-hardening.ps1`)
+
+Automated Group Policy hardening implementing:
+
+| Control | Setting | Why It Matters |
+|---|---|---|
+| Kerberos Encryption | AES-256 only, RC4 disabled | Prevents offline cracking of TGS tickets |
+| LSASS Protection | RunAsPPL enabled | Blocks credential dumping (Mimikatz) |
+| Password Policy | 14+ chars, complexity, 24 history | Reduces brute-force and spray attack surface |
+| Account Lockout | 5 attempts / 30 min lockout | Limits password guessing |
+| NTLM Restriction | Deny all in domain | Forces Kerberos, eliminates relay attacks |
+| Audit Policies | 4624/4625/4768/4769 enabled | Ensures detection visibility |
+
+### Security Audit Checklist (`hardening/audit-checklist.md`)
+
+A 60+ item checklist covering password policy, privileged accounts, SPN hygiene, delegation review, trust relationships, and GPO baseline validation.
+
+---
+
+## 🎯 MITRE ATT&CK Mapping {#mitre-attck-mapping}
+
+| Technique ID | Technique Name | Tactic | Lab Coverage |
+|---|---|---|---|
+| [T1558.003](https://attack.mitre.org/techniques/T1558/003/) | Kerberoasting | Credential Access | Attack sim + KQL + SPL + Hardening |
+| [T1558.004](https://attack.mitre.org/techniques/T1558/004/) | AS-REP Roasting | Credential Access | Attack sim + KQL + SPL + Hardening |
+| [T1558.001](https://attack.mitre.org/techniques/T1558/001/) | Golden Ticket | Credential Access | Detection rules |
+| [T1003.006](https://attack.mitre.org/techniques/T1003/006/) | DCSync | Credential Access | Detection rules |
+| [T1087.002](https://attack.mitre.org/techniques/T1087/002/) | Domain Account Discovery | Discovery | BloodHound guide |
+| [T1069.002](https://attack.mitre.org/techniques/T1069/002/) | Domain Groups Discovery | Discovery | BloodHound guide |
+
+---
+
+## 🛠️ Technologies {#technologies}
+
+| Category | Tools & Platforms |
+|---|---|
+| **Identity** | Active Directory Domain Services, Kerberos, Group Policy |
+| **Attack Tooling** | Rubeus, Impacket, BloodHound, SharpHound, Mimikatz |
+| **SIEM / Detection** | Microsoft Sentinel (KQL), Splunk (SPL) |
+| **Endpoint Telemetry** | Sysmon, Windows Event Forwarding, Security Event Log |
+| **Scripting** | PowerShell 5.1+, Python 3 |
+| **Virtualization** | VirtualBox / Hyper-V / VMware |
+| **Standards** | MITRE ATT&CK, CIS Benchmarks, Microsoft Security Baselines |
+
+---
+
+## 📁 Repository Structure
+
+```
+active-directory-hardening-lab/
+├── attacks/
+│   ├── kerberoasting-sim.ps1       # Kerberoasting attack simulation
+│   ├── asrep-roasting-sim.ps1      # AS-REP roasting attack simulation
+│   └── bloodhound-guide.md         # BloodHound attack path walkthrough
+├── hardening/
+│   ├── gpo-hardening.ps1           # Automated GPO hardening script
+│   └── audit-checklist.md          # 60+ item AD security audit checklist
+├── detection/
+│   ├── kql-detections.kql          # Microsoft Sentinel KQL detection rules
+│   └── splunk-detections.spl       # Splunk SPL detection queries
+├── lab-setup/
+│   └── lab-topology.md             # Complete lab environment build guide
+├── .gitignore
+├── LICENSE
+└── README.md
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Windows Server 2019 (or later) ISO for Domain Controller
+- Windows 10/11 Pro ISO for client machine
+- Kali Linux ISO (or any Debian-based distro)
+- Hypervisor: Hyper-V, VirtualBox, or VMware Workstation
+- 16 GB RAM minimum (32 GB recommended)
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/ajit028/active-directory-hardening-lab.git
+cd active-directory-hardening-lab
+
+# Follow the lab setup guide
+# → lab-setup/lab-topology.md
+
+# Run attack simulations (from domain-joined machine)
+.\attacks\kerberoasting-sim.ps1 -Verbose
+
+# Apply hardening controls (from Domain Controller)
+.\hardening\gpo-hardening.ps1
+
+# Deploy detection rules to your SIEM
+# → detection/kql-detections.kql (Sentinel)
+# → detection/splunk-detections.spl (Splunk)
+```
+
+---
+
+## ⚠️ Disclaimer
+
+This project is intended for **authorized security testing and educational purposes only**. All attack simulations must be conducted in isolated lab environments. Unauthorized use of these techniques against systems you do not own or have explicit permission to test is illegal and unethical.
+
+---
+
+## 👤 Author
+
+**Ajit Nayak**
+
+- 🌐 Portfolio: [ajit028.github.io](https://ajit028.github.io)
+- 💼 LinkedIn: [linkedin.com/in/ajit028](https://linkedin.com/in/ajit028)
+- 🐙 GitHub: [github.com/ajit028](https://github.com/ajit028)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
