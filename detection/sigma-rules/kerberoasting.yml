@@ -1,0 +1,27 @@
+title: Kerberoasting Activity Detected - Service Ticket Request
+id: 5b4c9e82-1a3b-4c2d-8e9f-0123456789ab
+status: production
+description: Detects potential Kerberoasting attacks by monitoring for RC4 encryption or high volume of TGS-REQ (Event ID 4769) for user principal names acting as service principals.
+references:
+  - https://attack.mitre.org/techniques/T1558/003/
+  - https://www.netwrix.com/kerberoasting_detection.html
+author: Ajit Nayak
+date: 2026/09/19
+tags:
+  - attack.credential_access
+  - attack.t1558.003
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4769
+    TicketOptions|contains: '0x40810000' # Typical options or analyze encryption type
+  filter_aes:
+    TicketEncryptionType:
+      - '0x17' # RC4-HMAC (Weak encryption heavily used in Kerberoasting)
+      - '0x18'
+  condition: selection and filter_aes
+falsepositives:
+    - Legitimate legacy applications requesting RC4 tickets for service accounts.
+level: high

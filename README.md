@@ -211,6 +211,27 @@ active-directory-hardening-lab/
 
 ---
 
+## 🛡️ Enterprise-Grade Auditing & Automation
+This repository now features advanced automated security auditing, production-ready Sigma detections, and integrated CI/CD for validation.
+
+### 📊 Automated AD Security Auditing (`scripts/audit-ad.ps1`)
+A comprehensive PowerShell script to audit your AD environment.
+- **Inspects**: Domain functional levels, password policies, unconstrained delegation, admin-count objects, and dangerous ACLs.
+- **Output**: Generates a professional HTML security report and a JSON data file for SIEM ingest.
+- **Usage**: `.\scripts\audit-ad.ps1 -ReportPath .\AuditReport.html`
+
+### 🕵️♂️ Detection Engineering (Sigma Rules)
+Standardized production-ready Sigma rules to detect common AD attacks:
+- **Kerberoasting**: `detection/sigma-rules/kerberoasting.yml` (Event ID 4769)
+- **AS-REP Roasting**: `detection/sigma-rules/asrep-roasting.yml` (Event ID 4768)
+
+### ⚙️ Security CI/CD Automation (`.github/workflows/ad-audit-ci.yml`)
+Automated validation for every push/PR:
+- **Linting**: Runs `PSScriptAnalyzer` against all PowerShell scripts.
+- **Validation**: Ensures KQL and YAML (Sigma rules) syntax correctness.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites

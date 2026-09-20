@@ -1,0 +1,23 @@
+title: AS-REP Roasting Activity Detected - Pre-authentication Not Required
+id: 7c5d0f93-2b4c-5d3e-9f0a-1234567890bc
+status: production
+description: Detects AS-REP Roasting attacks where requests are made for users with 'Do not require Kerberos pre-authentication' enabled (Event ID 4768).
+references:
+  - https://attack.mitre.org/techniques/T1558/004/
+  - https://adsecurity.org/?p=3238
+author: Ajit Nayak
+date: 2026/09/19
+tags:
+  - attack.credential_access
+  - attack.t1558.004
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4768
+    PreAuthType: '0'
+  condition: selection
+falsepositives:
+    - Service accounts or legacy systems configured without pre-authentication for specific application requirements.
+level: high

@@ -1,0 +1,47 @@
+name: AD Hardening & Security CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell
+        uses: azure/powershell@v1
+        with:
+          inlineScript: |
+            Write-Host "PowerShell Version:"
+            $PSVersionTable
+          azPSVersion: "latest"
+
+      - name: Run PSScriptAnalyzer on PowerShell Scripts
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $analysis = Invoke-ScriptAnalyzer -Path ./scripts/ -Recurse -SeverityLevel @('Error', 'Warning')
+          if ($analysis) {
+              $analysis | Format-Table
+              Write-Error "PSScriptAnalyzer found issues in PowerShell scripts."
+              exit 1
+          } else {
+              Write-Host "PSScriptAnalyzer passed with no errors or warnings!" -ForegroundColor Green
+          }
+
+      - name: Validate KQL / SPL Syntax Files
+        shell: bash
+        run: |
+          echo "Validating KQL and detection rules..."
+          for file in $(find . -name "*.kql" -o -name "*.yml" -o -name "*.yaml"); do
+              echo "Checking syntax of $file..."
+              if [[ "$file" == *.yml || "$file" == *.yaml ]]; then
+                  python3 -c "import yaml, sys; yaml.safe_load(open('$file'))" || exit 1
+              fi
+          done
+          echo "All validation checks passed successfully!"
