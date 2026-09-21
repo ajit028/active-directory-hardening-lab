@@ -1,0 +1,86 @@
+{ 
+  "widgets": [ ], 
+  "title": "AD Security Dashboard (Lab)", 
+  "author": "Ajit Nayak", 
+  "description": "Real-time SIEM view of Active Directory security events. Triage Kerberoasting, DCSync, and Privilege Escalation indicators using threat intelligence and risk scoring", 
+  "panels": [
+    {
+      "type": "metric", 
+      "title": "Kerberoasting Attempts", 
+      "field": "EventCode=4769", 
+      "value": 0, 
+      "description": "Number of service ticket requests with RC4 encryption (T1558.003)"
+    }, 
+    {
+      "type": "metric", 
+      "title": "DCSync Events", 
+      "field": "EventCode=4662 && (ExtendedRightGuid=11316f70-8bcf-11d1-a3f0-00aa0031c784 || ExtendedRightGuid=11316f73-8bcf-11d1-a3f0-00aa0031c784)", 
+      "value": 0, 
+      "description": "Attempts to replicate directory changes (T1003.006)"
+    }, 
+    {
+      "type": "metric", 
+      "title": "Account Creations (Privileged)", 
+      "field": "EventCode=4720 && (TargetUserName Like '*admin*' OR TargetUserName Like '*svc*')", 
+      "value": 0, 
+      "description": "Creation of new domain user accounts, suspicious for persistence"
+    }, 
+    {
+      "type": "metric", 
+      "title": "ACL Modifications (Privilege Escalation)", 
+      "field": "EventCode=4738", 
+      "value": 0, 
+      "description": "Modification of sensitive security group / user objects (T1098)"
+    }, 
+    {
+      "type": "heatmap", 
+      "title": "Event Frequency Over Time", 
+      "field": "EventTime", 
+      "series": "EventCode", 
+      "description": "Heatmap of AD security events by hour and event type"
+    }, 
+    {
+      "type": "table", 
+      "title": "Recent High-Risk Accounts", 
+      "field": "User Name", 
+      "size": 10, 
+      "description": "Top accounts with multiple permission changes (RBAC risk)"
+    }, 
+    {
+      "type": "single_value", 
+      "title": "Tier 1 Tier Score", 
+      "field": "Tier", 
+      "filter": "RiskScore>80", 
+      "description": "Current risk level for Tier 0 Domain Controllers"
+    }
+  ], 
+  "layout": {
+    "h": 30, 
+    "w": 24, 
+    "x": 0, 
+    "y": 0
+  }, 
+  "refresh": "5m", 
+  "editable": false, 
+  "id": "ad-security-dashboard", 
+  "interval": "", 
+  "links": [ ], 
+  "time": {
+    "from": "now-1h", 
+    "to": "now"
+  }, 
+  "timezone": "UTC", 
+  "uid": "ad-security-dashboard", 
+  "schemaVersion": 37, 
+  "version": "1", 
+  "orgId": 1, 
+  "folder": "Active Directory", 
+  "tags": [ 
+    "active-directory", 
+    "siem", 
+    "security", 
+    "cybersecurity", 
+    "soc"
+  ], 
+  "theme": "light"
+}

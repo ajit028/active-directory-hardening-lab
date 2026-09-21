@@ -165,14 +165,49 @@ A 60+ item checklist covering password policy, privileged accounts, SPN hygiene,
 
 | Technique ID | Technique Name | Tactic | Lab Coverage |
 |---|---|---|---|
-| [T1558.003](https://attack.mitre.org/techniques/T1558/003/) | Kerberoasting | Credential Access | Attack sim + KQL + SPL + Hardening |
+| [T1558.003](https://attack.mitre.org/techniques/T1558/003/) | Kerberoasting | Credential Access | Attack sim + KQL + SPL + Hardening + **IR Playbook** |
 | [T1558.004](https://attack.mitre.org/techniques/T1558/004/) | AS-REP Roasting | Credential Access | Attack sim + KQL + SPL + Hardening |
-| [T1558.001](https://attack.mitre.org/techniques/T1558/001/) | Golden Ticket | Credential Access | Detection rules |
-| [T1003.006](https://attack.mitre.org/techniques/T1003/006/) | DCSync | Credential Access | Detection rules |
+| [T1558.001](https://attack.mitre.org/techniques/T1558/001/) | Golden Ticket | Credential Access | Detection rules + **IR Playbook** |
+| [T1003.006](https://attack.mitre.org/techniques/T1003/006/) | DCSync | Credential Access | Detection rules + **DCSync Simulation** + **IR Playbook** |
 | [T1087.002](https://attack.mitre.org/techniques/T1087/002/) | Domain Account Discovery | Discovery | BloodHound guide |
 | [T1069.002](https://attack.mitre.org/techniques/T1069/002/) | Domain Groups Discovery | Discovery | BloodHound guide |
+| [T1136.002](https://attack.mitre.org/techniques/T1136/002/) | Account Creation | Persistence | **IR Playbook** |
+| [T1098](https://attack.mitre.org/techniques/T1098/) | Account Manipulation | Privilege Escalation | **IR Playbook** + **SIEM Dashboard** |
 
 ---
+
+## 🛡️ Incident Response Playbooks {#incident-response-playbooks}
+
+When a security incident occurs, fast triage and structured response are critical. This repository now includes a comprehensive Incident Response playbook for Active Directory compromises.
+
+### 📋 Kerberoasting & DCSync IR Playbook (`playbooks/ad-compromise-ir.md`)
+
+A complete guide covering:
+- **Kerberoasting Triage**: Detecting Event ID 4769 RC4 requests, KQL threat-hunting queries, containment & remediation steps (password rotation, migration to gMSA).
+- **DCSync Triage**: Detecting Event ID 4662 with replication rights, isolating compromised hosts, ACL audits, and `krbtgt` double-reset procedures.
+- **Tier Administration Model**: Strict Tier 0 / Tier 1 / Tier 2 separation with Privileged Access Workstation (PAW) requirements and cross-tier access controls.
+- **Forest Recovery & DC Restoration**: Non-authoritative vs. authoritative restores, rebuilding the PDC Emulator, lingering object cleanup, and integrity verification.
+
+---
+
+### 🖥️ DCSync Simulation & Detection Guide (`scripts/simulate-dcsync.ps1`)
+
+A PowerShell script to audit Active Directory for DCSync permissions and simulate replication rights discovery:
+- Discovers non-standard principals holding `Replicating Directory Changes` / `Replicating Directory Changes All` rights.
+- Generates SOC-ready alerting guidance and SIEM query examples (Splunk / Sentinel).
+- Audits Domain object ACLs for replication threats (MITRE ATT&CK T1003.006).
+
+---
+
+### 📊 Enterprise SIEM Dashboard (`dashboards/ad-security-dashboard.json`)
+
+A Splunk Dashboard Studio JSON template for visualizing Active Directory security telemetry:
+- **Real-time metrics**: Kerberoasting attempts, DCSync events, account creations, and ACL modifications.
+- **Risk heatmaps**: Event frequency over time and tiered risk scores for Tier 0/1/2 assets.
+- **High-risk account tables**: Top accounts with multiple permission changes.
+- **Automated 5-minute refresh** with configurable time windows.
+
+
 
 ## 🛠️ Technologies {#technologies}
 
@@ -204,6 +239,13 @@ active-directory-hardening-lab/
 │   └── splunk-detections.spl       # Splunk SPL detection queries
 ├── lab-setup/
 │   └── lab-topology.md             # Complete lab environment build guide
+├── playbooks/
+│   └── ad-compromise-ir.md         # AD Incident Response playbook (Kerberoasting, DCSync, Tier Admin, Forest Recovery)
+├── dashboards/
+│   └── ad-security-dashboard.json  # Splunk Dashboard Studio JSON template
+├── scripts/
+│   ├── audit-ad.ps1                # Enterprise AD security audit script
+│   └── simulate-dcsync.ps1         # DCSync permissions discovery & alerting guide
 ├── .gitignore
 ├── LICENSE
 └── README.md

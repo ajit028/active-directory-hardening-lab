@@ -19,6 +19,7 @@ Thumbs.db
 # BloodHound data
 *BloodHound.zip
 *.json
+!dashboards/*.json
 
 # Visual Studio Code / Editor Settings
 .vscode/
